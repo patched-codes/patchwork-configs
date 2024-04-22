@@ -9,20 +9,25 @@ context_size: 1000
 
 # CallOpenAI Inputs
 # openai_api_key: required
-model: gpt-3.5-turbo
-client_base_url: https://api.openai.com/v1
+openai_api_key: no_key_open_source_local
+model: llama-3-8B
+client_base_url: http://localhost:8000/v1
+#model: gpt-3.5-turbo
+# client_base_url: http://localhost:8000/v1
+github_api_key: your-api-key
 # Example HF model
-# client_base_url: https://api-inference.huggingface.co/models/codellama/CodeLlama-70b-Instruct-hf/v1
-# model: codellama/CodeLlama-70b-Instruct-hf
+# client_base_url: https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-70B-Instruct/v1
+# model: meta-llama/Meta-Llama-3-70B-Instruct
 # model_temperature: 0.2
 # model_top_p: 0.95
 # model_max_tokens: 2000
+allow_truncated: false
 
 # CommitChanges Inputs
 disable_branch: false
 
 # CreatePR Inputs
 disable_pr: false
-force_pr_creation: false
+force_pr_creation: true
 # github_api_key: required-for-github-scm
 # gitlab_api_key: required-for-gitlab-scm

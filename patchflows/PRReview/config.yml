@@ -1,6 +1,6 @@
 # PRReview Inputs
-diff_summary: long
-diff_suggestion: false
+diff_summary: short
+diff_suggestion: true
 
 
 # ReadPRDiffs Inputs
@@ -13,8 +13,10 @@ diff_suggestion: false
 
 # CallOpenAI Inputs
 # openai_api_key: required
-model: gpt-3.5-turbo
-client_base_url: https://api.openai.com/v1
+openai_api_key: no_key_open_source_local
+model: llama-3-8B
+client_base_url: http://localhost:8000/v1
+github_api_key: your-api-key
 # Example HF model
 # client_base_url: https://api-inference.huggingface.co/models/codellama/CodeLlama-70b-Instruct-hf/v1
 # model: codellama/CodeLlama-70b-Instruct-hf
