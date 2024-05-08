@@ -6,4 +6,8 @@ This is a repository that contains the standard set of configuration and prompts
 patchwork AutoFix --config /path/to/patchwork-configs/patchflows
 ```
 
-The `--config` flag takes a folder that has sub-folders for each patchflow and under them there are two files `config.yml` and `prompt.json`. These files contain the defaut configuration and prompts. You can edit and customize them based on your needs.
+The `--config` flag takes a folder that has sub-folders for each patchflow and under them there are two files `config.yml` and `prompt.json`. These files contain the defaut configuration and prompts. You can edit and customize them based on your needs. You can also define your own patchflow and load it using the `--config` flag. As an example, there is a `HelloWorld` patchflow that can be run as follows:
+
+```
+patchwork HelloWorld --config /path/to/patchwork-configs/patchflows
+```
