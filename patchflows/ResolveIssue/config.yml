@@ -2,6 +2,7 @@
 # github_api_key: required-for-github-scm
 # gitlab_api_key: required-for-gitlab-scm
 # issue_url: required
+# fix_issue: false
 
 # GenerateEmbeddings Inputs
 # For OpenAI API use the following the select the model
@@ -10,3 +11,13 @@
 # huggingface_embedding_model: codellama/CodeLlama-70b-Instruct-hf
 # For either API, use the following to provide the API key
 # openai_api_key: required-for-openai
+
+# model: gpt-4 
+allow_truncated: false
+
+# CommitChanges Inputs
+disable_branch: false
+
+# CreatePR Inputs
+disable_pr: false
+force_pr_creation: true
