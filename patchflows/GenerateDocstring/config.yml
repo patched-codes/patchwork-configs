@@ -1,0 +1,30 @@
+base_path: .
+force_code_contexts: false
+# PreparePrompt Inputs
+# prompt_template_file: your-prompt-template-here
+
+# CallOpenAI Inputs
+openai_api_key: no_key_open_source_local
+model: llama-3-8B
+client_base_url: http://localhost:8000/v1
+github_api_key: your-api-key
+# client_base_url: https://api.openai.com/v1
+# Example HF model
+# client_base_url: https://api-inference.huggingface.co/models/codellama/CodeLlama-70b-Instruct-hf/v1
+# model: codellama/CodeLlama-70b-Instruct-hf
+# model_temperature: 0.5
+# model_top_p: 0.95
+# model_max_tokens: 512
+# model_extra_body: 
+#  repetition_penalty: 1.1
+# model_stop: '\n\n'
+# allow_truncated: true
+
+# CommitChanges Inputs
+disable_branch: false
+
+# CreatePR Inputs
+disable_pr: false
+force_pr_creation: true
+# github_api_key: required-for-github-scm
+# gitlab_api_key: required-for-gitlab-scm
