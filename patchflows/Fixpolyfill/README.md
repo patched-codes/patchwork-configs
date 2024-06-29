@@ -6,6 +6,12 @@ It is now believed that the attack was more widespread. It also affects the foll
 
 The original rule published by the Semgrep team doesn't detect these, you can use the updated version we have made available [here](https://semgrep.dev/playground/r/KxUvD7w/asankhaya_personal_org.polyfill-compromise-copy). We have also updated the config and prompt for the **Fixpolyfill** patchflow so that it can help remediate this issue in your code. 
 
+You can use the updated rule as follows:
+
+```
+ patchwork AutoFix semgrep_extra_args='--config r/KxUvD7w/asankhaya_personal_org.polyfill-compromise-copy' 
+```
+
 ## Fixpolyfill Patchflow
 Recently, there has been a supply chain attack on the CDN service, polyfill.io, that was delivering malicious JavaScript code. A malicious actor took control
 of the domain and used to deliver malware to over 100k website that relied on the CDN service. 
