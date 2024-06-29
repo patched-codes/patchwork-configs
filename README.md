@@ -17,5 +17,5 @@ Hello World!
 
 This repository also contains some additional patchflows that are implemented for specific use cases. You can use them as a basis for your own custom patchflows.
 
-- [Fixployfill](/patchflows/Fixpolyfill)
+- [Fixpolyfill](/patchflows/Fixpolyfill)
 
