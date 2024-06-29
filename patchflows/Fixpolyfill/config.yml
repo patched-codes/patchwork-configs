@@ -3,7 +3,7 @@ vulnerability_limit: 10
 context_size: 2000
 # sari_file_path should point to the generated SARIF file relative to the working directory
 # sarif_file_path: /mnt/data/sarif.json
-semgrep_extra_args: --config r/3qUkGp2/semgrep.polyfill-compromise
+semgrep_extra_args: --config r/KxUvD7w/asankhaya_personal_org.polyfill-compromise-copy
 
 # PreparePrompt Inputs
 # prompt_template_file: your-prompt-template-here
