@@ -1,5 +1,12 @@
 # Polyfill Supply Chain Attack, Patched!
 
+__Update on 29th June 2024__
+
+It is now believed that the attack was more widespread. It also affects the following domains - bootcdn.net, bootcss.com, staticfile.net, staticfile.org, unionadjs.com, xhsbpza.com, union.macoms.la, newcrbpc.com 
+
+The original rule published by the Semgrep team doesn't detect these, you can use the updated version we have made available [here](https://semgrep.dev/playground/r/KxUvD7w/asankhaya_personal_org.polyfill-compromise-copy) 
+
+
 Recently, there has been a supply chain attack on the CDN service, polyfill.io, that was delivering malicious JavaScript code. A malicious actor took control
 of the domain and used to deliver malware to over 100k website that relied on the CDN service. 
 
