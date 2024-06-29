@@ -11,10 +11,21 @@ semgrep_extra_args: --config r/3qUkGp2/semgrep.polyfill-compromise
 # CallOpenAI Inputs
 # openai_api_key: required
 openai_api_key: your-api-key
+
 model: gpt-3.5-turbo
 # model: gpt-3.5-turbo
 # client_base_url: http://localhost:8000/v1
+
+# GitHub Token
 github_api_key: your-api-key
+# To run on all repos your github_api_key has access to uncomment below
+# github_org_name: org_name
+
+# Gitlab Token
+# gitlab_api_key: your-api-key
+# To run on all repos your gitlab_api_key has access to uncomment below
+# gitlab_org_name: org_name
+
 # Example HF model
 # client_base_url: https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-70B-Instruct/v1
 # model: meta-llama/Meta-Llama-3-70B-Instruct
