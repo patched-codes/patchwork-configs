@@ -3,7 +3,7 @@
 Recently, there has been a supply chain attack on the CDN service, polyfill.io, that was delivering malicious JavaScript code. A malicious actor took control
 of the domain and used to deliver malware to over 100k website that relied on the CDN service. 
 
-Semgrep posted on their [blog](https://semgrep.dev/blog/2024/protect-your-code-from-the-polyfill-supply-chain-attack) a new rule that can help detect the use of polyfill in your code. Along with semgrep, we can use [patchwork](hhttps://github.com/patched-codes/patchwork) to detect and fix the use of polyfill by either removing it fully from code or replacing it with a new implementation from [cloudflare](https://blog.cloudflare.com/polyfill-io-now-available-on-cdnjs-reduce-your-supply-chain-risk).
+Semgrep has released a new rule on their [blog](https://semgrep.dev/blog/2024/protect-your-code-from-the-polyfill-supply-chain-attack) that can help detect the use of polyfill in your code. Along with semgrep, we can use [patchwork](hhttps://github.com/patched-codes/patchwork) to detect and fix the use of polyfill by either removing it fully from code or replacing it with a new implementation from [cloudflare](https://blog.cloudflare.com/polyfill-io-now-available-on-cdnjs-reduce-your-supply-chain-risk).
 
 We already have an [AutoFix](https://github.com/patched-codes/patchwork/blob/main/patchwork/patchflows/AutoFix/README.md) patchflow that works quite well
 to fix vulnerabilities in the code. AutoFix uses Semgrep OSS to scan the repo for issues. We can pass the new rule as an extra argument to the patchflow to detect this particular issue as follows:
