@@ -12,3 +12,10 @@ The `--config` flag takes a folder that has sub-folders for each patchflow and u
 patchwork HelloWorld --config ../patchwork-configs/patchflows
 Hello World!
 ```
+
+## List of custom patchflows
+
+This repository also contains some additional patchflows that are implemented for specific use cases. You can use them as a basis for your own custom patchflows.
+
+- [Fixployfill](/patchflows/Fixpolyfill)
+
