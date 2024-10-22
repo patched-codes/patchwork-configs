@@ -1,1 +1,3 @@
 output_path: "sbom.csv"
+language: go
+license: true

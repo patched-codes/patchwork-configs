@@ -1,15 +1,14 @@
+import csv
 from pathlib import Path
 
 import yaml
-import pandas as pd
 
 from patchwork.common.utils.progress_bar import PatchflowProgressBar
 from patchwork.common.utils.step_typing import validate_steps_with_inputs
 from patchwork.logger import logger
 from patchwork.step import Step
-from patchwork.steps import (
-    ScanDepscan,
-)
+from patchwork.steps import ScanDepscan
+
 
 
 _DEFAULT_INPUT_FILE = Path(__file__).parent / "defaults.yml"
@@ -23,7 +22,7 @@ class DependencyReport(Step):
         final_inputs.update(inputs)
 
         validate_steps_with_inputs(
-            set(final_inputs.keys()).union({"prompt_values"}),
+            set(final_inputs.keys()),
             ScanDepscan
         )
 
@@ -33,42 +32,46 @@ class DependencyReport(Step):
         outputs = ScanDepscan(self.inputs).run()
         self.inputs.update(outputs)
         sbom_values = self.inputs.get("sbom_vdr_values")
-
-        csv_data = []
-        for component in sbom_values.get("components", []):
-            coordinate = component.get("bom-ref")
-            version = component.get("version", "None")
-            properties = component.get("properties", [])
-            direct = "Unknown"
-
-            if not coordinate.startswith("pkg:golang"):
-                continue
-
-            for property in properties:
-                if property.get("name") == "cdx:go:indirect":
-                    direct = property.get("value")
-
-            licenses = component.get("licenses", [])
-            if len(licenses) < 1:
-                csv_data.append({
-                    "coordinate": coordinate,
-                    "version": version,
-                    "license": "Unknown",
-                    "direct": direct,
-                })
-                continue
-
-            for component_license in component.get("licenses", []):
-                maybe_license = component_license.get("license", {}).get("id", "Unknown")
-                csv_data.append({
-                    "coordinate": coordinate,
-                    "version": version,
-                    "license": maybe_license,
-                    "direct": direct,
-                })
-
-        df = pd.DataFrame.from_records(csv_data)
         output_path = self.inputs.get("output_path")
-        df.to_csv(output_path, index=False)
+
+        logger.info(f"Report is being written to {output_path}")
+        with open(output_path, "w", newline="") as csvfile:
+            fieldnames = ["coordinate", "version", "license", "indirect"]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+
+            for component in sbom_values.get("components", []):
+                coordinate = component.get("bom-ref")
+                version = component.get("version", "None")
+                properties = component.get("properties", [])
+                indirect = "Unknown"
+                is_image = False
+
+                for property in properties:
+                    if property.get("name") == "cdx:go:indirect":
+                        indirect = property.get("value")
+
+                    if property.get("name") == "oci:SrcImage":
+                        is_image = True
+
+                licenses = component.get("licenses", [])
+                if len(licenses) < 1:
+                    writer.writerow({
+                        "coordinate": coordinate,
+                        "version": version,
+                        "license": "Unknown",
+                        "indirect": indirect,
+                    })
+                    continue
+
+                for component_license in component.get("licenses", []):
+                    maybe_license = component_license.get("license", {}).get("id", "Unknown")
+                    writer.writerow({
+                        "coordinate": coordinate,
+                        "version": version,
+                        "license": maybe_license,
+                        "indirect": indirect,
+                    })
+
         logger.info(f"Report written to {output_path}")
         return self.inputs
