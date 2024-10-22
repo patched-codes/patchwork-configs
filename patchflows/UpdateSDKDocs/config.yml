@@ -1,0 +1,32 @@
+sdk_src_folder: ./packages/stack/src
+sdk_docs_folder: ./docs/fern/docs/pages/sdk
+filter: '*.tsx,*ts'
+
+# CallOpenAI Inputs
+# openai_api_key: required
+openai_api_key: your_key
+anthropic_api_key: your_key
+# model: gpt-4o
+model: claude-3-5-sonnet-20240620
+json: true
+# model: gpt-3.5-turbo
+# client_base_url: http://localhost:8000/v1
+# GitHub Token
+github_api_key: your_key
+
+# Example HF model
+# client_base_url: https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-70B-Instruct/v1
+# model: meta-llama/Meta-Llama-3-70B-Instruct
+# model_temperature: 0.1
+# model_top_p: 0.95
+model_max_tokens: 4096
+allow_truncated: false
+
+# CommitChanges Inputs
+disable_branch: false
+
+# CreatePR Inputs
+disable_pr: false
+force_pr_creation: true
+# github_api_key: required-for-github-scm
+# gitlab_api_key: required-for-gitlab-scm
