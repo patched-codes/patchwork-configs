@@ -54,9 +54,6 @@ class DependencyReport(Step):
                     if property.get("name") == "oci:SrcImage":
                         is_image = True
 
-                if is_image:
-                    continue
-
                 licenses = component.get("licenses", [])
                 if len(licenses) < 1:
                     writer.writerow({
