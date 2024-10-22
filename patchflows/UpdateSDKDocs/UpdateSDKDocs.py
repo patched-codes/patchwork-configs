@@ -9,7 +9,9 @@ from patchwork.step import Step
 from patchwork.steps import (
     SimplifiedLLMOnce,
     ModifyCodePB,
-    PR
+    PR,
+    ReadFile,
+    TsMorph
 )
 
 _DEFAULT_INPUT_FILE = Path(__file__).parent / "config.yml"
@@ -37,54 +39,128 @@ class UpdateSDKDocs(Step):
         
         # Convert the file pattern string to a list
         file_patterns = [pattern.strip() for pattern in self.inputs["filter"].split(',')]
-        
-        # Walk through the directory tree
-        for root, dirs, files in os.walk(abs_path):
-            for filename in files:
-                if any(fnmatch.fnmatch(filename, pattern) for pattern in file_patterns):
-                    file_path = os.path.join(root, filename)
-                    logger.debug(f"Processing file: {file_path}")
-                    with open(file_path, 'r') as file:
-                        content = file.read()
-                        self.inputs["prompt_value"] = {}
-                        self.inputs["prompt_user"] = f"""# Task: Extract Full Exported Code Elements (Components, Classes, and Methods)
+        self.inputs["file_path"] = abs_path + "/index.tsx"
+        index_file_content = ReadFile(self.inputs).run()["file_content"]
+        self.inputs["prompt_value"] = {}
+        prompt = f"""You are an AI assistant designed to parse JavaScript/TypeScript export statements and generate a JSON output. Your task is to analyze the contents of a file containing export statements and create a structured JSON representation of the exported types and their file paths.
 
-You are a precise code analyzer. Your task is to examine the provided code snippet and extract all fully defined exported components, classes, and methods as a list of complete code snippets. Follow these steps:
+Input:
+1. A `base_path` string that represents the root directory for the file paths.
+2. The contents of a file containing export statements.
 
-1. Analyze the code to find all exported components, classes, and methods that are fully defined within the file.
-2. Create a JSON object with an "exports" key containing an array of the full code of each exported element.
+Your task is to:
+1. Parse each export statement in the file.
+2. Extract the names of the exported types and the file paths they are exported from.
+3. Combine the `base_path` with the relative path in the export statement to create the full file path.
+4. Generate a JSON output with an "exported_types" array containing objects with "name" and "file_path" properties for each exported type.
+
+Rules for parsing:
+1. For named exports like `export {{ A, B }} from "./path/to/file"`, create an entry for each exported name.
+2. For default exports like `export {{ default as Name }} from "./path/to/file"`, create an entry for the renamed default export.
+3. For star exports like `export * from './lib/stack-app'`, do not create any entries (as we can't determine specific type names).
+4. For direct exports like `export {{ Name }}` without a `from` clause, skip the entry (as we don't have path information).
+5. Assume all files are TypeScript (.tsx) unless explicitly stated otherwise in the path.
+
+Output format:
+{{
+  "exported_types": [
+    {{
+      "name": "ExportedTypeName",
+      "file_path": "full/path/to/file.tsx"
+    }}
+  ]
+}}
+
+IMPORTANT: Your response must be ONLY the JSON object in the exact format shown above. Do not include any explanations, comments, or additional text. The JSON should be valid and parseable.
+
+Example input:
+base_path: "/src/components"
+File contents:
+```
+export {{ default as StackProvider }} from "./providers/stack-provider";
+export {{ useUser, useStackApp }} from "./lib/hooks";
+export * from './lib/stack-app';
+export {{ SignIn }} from "./components-page/sign-in";
+```
+
+Example output:
+{{
+  "exported_types": [
+    {{
+      "name": "StackProvider",
+      "file_path": "/src/components/providers/stack-provider.tsx"
+    }},
+    {{
+      "name": "useUser",
+      "file_path": "/src/components/lib/hooks.tsx"
+    }},
+    {{
+      "name": "useStackApp",
+      "file_path": "/src/components/lib/hooks.tsx"
+    }},
+    {{
+      "name": "SignIn",
+      "file_path": "/src/components/components-page/sign-in.tsx"
+    }}
+  ]
+}}
+
+Now, parse the following file and generate the JSON output:
+
+base_path: {abs_path}
+file_content:
+{index_file_content}
+"""
+        self.inputs["prompt_user"] = prompt
+        response = SimplifiedLLMOnce(self.inputs).run()["extracted_response"]
+        exported_types = response["exported_types"]
+
+        for exported_type in exported_types:
+            self.inputs["file_path"] = exported_type["file_path"]
+            name = exported_type["name"]
+            self.inputs["variable_name"] = name
+            # print(type_information)
+            # exit(0)
+            content = ReadFile(self.inputs).run()["file_content"]
+            if content == "":
+                self.inputs["file_path"] = self.inputs["file_path"][:-1]
+                content = ReadFile(self.inputs).run()["file_content"]
+            type_information = TsMorph(self.inputs).run()["type_information"]
+            self.inputs["prompt_user"] = f"""# Task: Extract Specific Named Exported Code Element
+
+You are a precise code analyzer. Your task is to examine the provided code snippet and extract a specific named exported component, class, or method as a complete code snippet. Follow these steps:
+
+1. Analyze the code to find the exported component, class, or method that matches the provided name.
+2. Create a JSON object with an "export" key containing a string with the full code of the matched exported element.
 
 ## Output Format
 
 Provide your response in the following JSON format only:
 
-```json
 {{
-  "exports": [
-    "string (full code snippet)",
-    "string (full code snippet)"
-  ]
+  "export": 
+    "string (full code snippet of the matched export)"  
 }}
-```
 
 ## Rules
 
-1. Only include explicitly exported components, classes, and methods that are fully defined within the file.
-2. Do not include re-exports or exports of items defined in other files.
-3. For languages without explicit exports (e.g., Python), assume all top-level component, class, and method definitions are exported, but still only include fully defined items.
-4. Do not include internal or private members unless they are part of the exported element's implementation.
-5. If no exports are found, return an empty array for the "exports" key.
-6. Do not include any explanations or notes outside the JSON object.
-7. For each export, include the entire implementation, not just the signature or declaration.
-8. Preserve all whitespace, comments, and formatting within each exported element.
-9. Do not include the language name or any other metadata.
-10. Do not include exported types, interfaces, or type aliases.
-11. For React components, include both function components and class components.
-12. Only include functions or components that are explicitly exported (e.g., have "export" keyword in TypeScript/JavaScript).
+1. Only include the explicitly exported component, class, or method that matches the provided name.
+2. The export must be fully defined within the file.
+3. Do not include re-exports or exports of items defined in other files.
+4. For languages without explicit exports (e.g., Python), assume all top-level component, class, and method definitions are exported, but still only include the one matching the provided name.
+5. Do not include internal or private members unless they are part of the exported element's implementation.
+6. If no matching export is found, return an empty array for the "export" key.
+7. Do not include any explanations or notes outside the JSON object.
+8. Include the entire implementation of the matched export, not just the signature or declaration.
+9. Preserve all whitespace, comments, and formatting within the exported element.
+10. Do not include the language name or any other metadata.
+11. Do not include exported types, interfaces, or type aliases, even if they match the name.
+12. For React components, include both function components and class components if they match the name.
+13. Only include functions or components that are explicitly exported (e.g., have "export" keyword in TypeScript/JavaScript) and match the provided name.
 
 ## Examples
 
-### Example 1: TypeScript with fully defined exports
+### Example 1: TypeScript with multiple exports, looking for "UserComponent"
 
 ```typescript
 export class User {{
@@ -109,19 +185,13 @@ export type UserType = {{
 }};
 ```
 
-Your output should be:
+If the provided name is "UserComponent", your output should be:
 
-```json
 {{
-  "exports": [
-    "export class User {{\\n  constructor(public name: string) {{}}\\n\\n  greet(): string {{\\n    return `Hello, ${{this.name}}!`;\\n  }}\\n}}",
-    "export function createUser(name: string): User {{\\n  return new User(name);\\n}}",
-    "export const UserComponent: React.FC<{{ user: User }}> = ({{ user }}) => {{\\n  return <div>{{user.greet()}}</div>;\\n}};"
-  ]
+  "export": "export const UserComponent: React.FC<{{ user: User }}> = ({{ user }}) => {{\\n  return <div>{{user.greet()}}</div>;\\n}};"
 }}
-```
 
-### Example 2: TypeScript with re-exports, types, and non-exported functions
+### Example 2: TypeScript with multiple exports, looking for "ProcessUser"
 
 ```typescript
 export {{ User }} from './user';
@@ -132,7 +202,7 @@ export interface UserInterface {{
   name: string;
 }}
 
-export function processUser(user: User) {{
+export function ProcessUser(user: User) {{
   console.log(user.name);
 }}
 
@@ -155,80 +225,173 @@ const InternalComponent = () => {{
 }};
 ```
 
-Your output should be:
+If the provided name is "ProcessUser", your output should be:
 
-```json
 {{
-  "exports": [
-    "export function processUser(user: User) {{\\n  console.log(user.name);\\n}}",
-    "export class UserManager {{\\n  private users: User[] = [];\\n\\n  addUser(user: User) {{\\n    this.users.push(user);\\n  }}\\n}}"
-  ]
+  "export": "export function ProcessUser(user: User) {{\\n  console.log(user.name);\\n}}"
 }}
-```
 
-Now, analyze the following code snippet and provide the output in the specified JSON format:
+Now, analyze the following code snippet and provide the output in the specified JSON format, extracting only the export that matches the provided name:
 
+Name to extract: {name}
+
+Code content:
 {content}
-"""
-                        response = SimplifiedLLMOnce(self.inputs).run()["extracted_response"]
-                        for export in response["exports"]:
-                            self.inputs["prompt_user"] = f"""# Task: Generate Interface-focused MDX Documentation for @stackframe/stack SDK Exports
+"""               
+#                         response = SimplifiedLLMOnce(self.inputs).run()["extracted_response"]
+#                         exports = response["exports"]
+#                         # print(exports)
+#                         # exit()
+#                         self.inputs["prompt_user"] = f"""# Task: Filter Explicit Exports
 
-You are a technical writer. Your task is to create clear and simple MDX documentation for a given exported type or method from the @stackframe/stack SDK, focusing only on its interface and usage. Follow these steps:
+# You are a precise code filter. Your task is to examine the provided list of exported code elements and filter out any that do not explicitly begin with the word "export". Follow these steps:
 
-1. Analyze the provided code snippet.
-2. Generate concise MDX documentation that explains how to use the exported type or method, without any implementation details.
-3. Use consistent and simple language throughout the documentation.
+# 1. Parse the input JSON object containing the "exports" array.
+# 2. For each item in the "exports" array, check if it starts with the word "export" (ignoring leading whitespace).
+# 3. Create a new JSON object with an "filteredExports" key containing an array of only the items that pass this check.
+
+# ## Input Format
+
+# The input will be in the following JSON format:
+
+# ```json
+# {{
+#   "exports": [
+#     "string (full code snippet)",
+#     "string (full code snippet)"
+#   ]
+# }}
+# ```
+
+# ## Output Format
+
+# Provide your response in the following JSON format only:
+
+
+# {{
+#   "filteredExports": [
+#     "string (full code snippet)",
+#     "string (full code snippet)"
+#   ]
+# }}
+
+
+# ## Rules
+
+# 1. Only include items that explicitly begin with the word "export".
+# 2. Ignore leading whitespace when checking for the "export" keyword.
+# 3. Preserve the entire code snippet for items that pass the filter.
+# 4. If no items pass the filter, return an empty array for the "filteredExports" key.
+# 5. Do not include any explanations or notes outside the JSON object.
+# 6. Preserve all whitespace, comments, and formatting within each exported element.
+
+# ## Examples
+
+# ### Example 1: Mixed exports
+
+# Input:
+# ```json
+# {{
+#   "exports": [
+#     "export function hello() {{\\n  console.log('Hello');\\n}}",
+#     "function notExported() {{\\n  console.log('Not exported');\\n}}",
+#     "export const greeting = 'Hello, world!';",
+#     "class InternalClass {{\\n  constructor() {{}}\\n}}"
+#   ]
+# }}
+# ```
+
+# Output:
+
+# {{
+#   "filteredExports": [
+#     "export function hello() {{\\n  console.log('Hello');\\n}}",
+#     "export const greeting = 'Hello, world!';"
+#   ]
+# }}
+
+
+# ### Example 2: No explicit exports
+
+# Input:
+# ```json
+# {{
+#   "exports": [
+#     "function notExported1() {{\\n  console.log('Not exported 1');\\n}}",
+#     "const notExported2 = () => {{\\n  console.log('Not exported 2');\\n}}",
+#     "class NotExportedClass {{\\n  constructor() {{}}\\n}}"
+#   ]
+# }}
+# ```
+
+# Output:
+
+# {{
+#   "filteredExports": []
+# }}
+
+
+# Now, analyze the following JSON object containing exports and provide the output in the specified JSON format, including only explicitly exported items:
+
+# {exports}
+# """
+            export = SimplifiedLLMOnce(self.inputs).run()['extracted_response']
+            # for export in exports["exports"]:
+            self.inputs["prompt_user"] = f"""# Task: Generate Concise MDX Documentation for @stackframe/stack SDK Exports
+
+You are a technical writer. Create concise MDX documentation for a given exported type or method from the @stackframe/stack SDK, focusing solely on its interface and usage. Follow these steps:
+
+1. Analyze the provided code snippet and type information, noting parameter types and optionality.
+2. Generate brief MDX documentation explaining how to use the exported type or method.
+3. Use consistent and simple language throughout.
 4. Determine the appropriate file name based on the export name.
-5. Create a JSON object with the file path, line numbers, and documentation content as a patch.
+5. Create a JSON object with the file path, line numbers, and documentation content as new_code.
 
 ## Input Variables
 
 - {{code_snippet}}: The full code of the exported type or method
 - {{sdk_docs_folder}}: The base path for the documentation files
+- {{type_information}}: Detailed type information obtained from tsx-morph analysis
 
 ## Output Format
 
 Provide your response in the following JSON format only:
 
-```json
 {{
   "file_path": "string",
   "start_line": number,
   "end_line": number,
-  "patch": "string"
+  "new_code": "string"
 }}
-```
 
 ## Rules
 
-1. The file name should be the kebab-case version of the exported type or method name, with an .mdx suffix.
-2. The file_path should be constructed by joining the sdk_docs_folder and the file name.
-3. The patch should contain the full content of the MDX file, including frontmatter.
-4. Use simple and consistent language. Avoid buzzwords and complex terms.
-5. Include only interface-related information: brief description, parameters, return value, and a basic usage example.
-6. Do not include any implementation details or explain how the function works internally.
-7. Ensure all parameters and types are accurately documented.
-8. start_line should always be 0, and end_line should be the total number of lines in the generated MDX content minus 1 (zero-based indexing).
-9. Do not include any explanations or notes outside the JSON object.
-10. Always use "@stackframe/stack" as the import source in examples and explanations.
-11. Use single quotes consistently throughout the documentation and examples.
-12. Avoid using console.log in examples unless absolutely necessary to demonstrate the function's output.
+1. Use kebab-case for the file name with an .mdx suffix.
+2. Construct file_path by joining sdk_docs_folder and the file name.
+3. Include the full MDX content in the new_code, including frontmatter.
+4. Use simple language. Avoid buzzwords and complex terms.
+5. Focus only on interface information: brief description, parameters, and a basic usage example.
+6. Omit implementation details.
+7. Document all parameters and types accurately, indicating optional parameters.
+8. If the function outputs a tsx component, ignore the top level `props` argument, and instead describe the component's props in a "Props" heading.
+9. Use 0 for start_line, and total lines minus 1 for end_line (zero-based indexing).
+10. Always import from "@stackframe/stack" in examples.
+11. Use single quotes in documentation and examples.
+12. Use ```tsx for all code blocks.
+13. Carefully identify and document optional parameters.
+14. Show usage with and without optional parameters when applicable.
+15. Do not include any additional paragraphs or sections after the example.
+16. Utilize the type_information to provide accurate and detailed type descriptions.
 
-## MDX Content Guidelines
+## MDX Content Structure
 
-1. Start with a frontmatter section containing a title (the original camelCase name of the export).
-2. Provide a brief, clear description of what the export does, focusing on its purpose, not its implementation.
-3. For functions or methods:
-   - List parameters with their types and a simple description.
-   - Describe the return value and its type within the main description, not as a separate section.
-4. For classes or types:
-   - List properties with their types and a simple description.
-   - Briefly describe any methods, focusing on what they do, not how they do it.
-5. Include one basic example of how to use the export, always importing from "@stackframe/stack".
-6. Use appropriate MDX and Markdown formatting for headings, code blocks, and lists.
-7. Do not include sections for notes, explanations, or conclusions.
-8. Do not mention any internal workings, algorithms, or implementation specifics.
+1. Frontmatter with title (camelCase name of the export)
+2. # Heading (export name)
+3. Brief description (1-2 sentences max)
+4. ## Parameters (if applicable)
+5. ## Props (if applicable)
+6. ## Example
+7. End the documentation after the example. Do not add any concluding paragraphs or notes.
 
 ## Example
 
@@ -246,16 +409,34 @@ export function calculateTotalPrice(items: Item[], discountCode?: string): numbe
 
 {{sdk_docs_folder}} = "/docs/sdk"
 
+{{type_information}} = ```
+{{
+  "kind": "FunctionDeclaration",
+  "name": "calculateTotalPrice",
+  "parameters": [
+    {{
+      "name": "items",
+      "type": "Item[]",
+      "isOptional": false
+    }},
+    {{
+      "name": "discountCode",
+      "type": "string",
+      "isOptional": true
+    }}
+  ],
+  "returnType": "number"
+}}
+```
+
 Your output should be:
 
-```json
 {{
   "file_path": "/docs/sdk/calculate-total-price.mdx",
   "start_line": 0,
-  "end_line": 18,
-  "patch": "---\\ntitle: calculateTotalPrice\\n---\\n\\n# calculateTotalPrice\\n\\nCalculates the total price of items, with an optional discount. Returns a number representing the total price of all items, with discount applied if a discount code was provided.\\n\\n## Parameters\\n\\n- `items`: `Item[]` - An array of items to calculate the total price for. Each item must have a `price` property.\\n- `discountCode`: `string` (optional) - A code to apply a discount to the total price.\\n\\n## Example\\n\\n```typescript\\nimport {{ calculateTotalPrice }} from '@stackframe/stack';\\n\\nconst items = [\\n  {{ price: 10 }},\\n  {{ price: 20 }},\\n  {{ price: 30 }}\\n];\\n\\nconst total = calculateTotalPrice(items);\\n// total is 60\\n\\nconst discountedTotal = calculateTotalPrice(items, 'DISCOUNT10');\\n// discountedTotal is 54\\n```"
+  "end_line": 22,
+  "new_code": "---\\ntitle: calculateTotalPrice\\n---\\n\\n# calculateTotalPrice\\n\\nCalculates the total price of items, with an optional discount. Returns a number representing the total price.\\n\\n## Parameters\\n\\n- `items`: `Item[]` - An array of items to calculate the total price for. Each item must have a `price` property.\\n- `discountCode` (optional): `string` - A code to apply a 10% discount to the total price.\\n\\n## Example\\n\\n```tsx\\nimport {{ calculateTotalPrice }} from '@stackframe/stack';\\n\\nconst items = [\\n  {{ price: 10 }},\\n  {{ price: 20 }},\\n  {{ price: 30 }}\\n];\\n\\n// Without discount\\nconst total = calculateTotalPrice(items);\\n\\n// With discount\\nconst discountedTotal = calculateTotalPrice(items, 'DISCOUNT10');\\n```"
 }}
-```
 
 Now, generate the MDX documentation for the following exported code snippet:
 
@@ -264,15 +445,20 @@ Now, generate the MDX documentation for the following exported code snippet:
 Base path for the documentation:
 
 {sdk_path}
+
+Type information:
+
+{type_information}
 """
-                            output = SimplifiedLLMOnce(self.inputs).run()["extracted_response"]
-                            self.inputs.update(output) 
-                            modified_code_files = ModifyCodePB(self.inputs).run()
-                            all_docs.append(modified_code_files)
+            output = SimplifiedLLMOnce(self.inputs).run()["extracted_response"]
+            self.inputs.update(output) 
+            modified_code_files = ModifyCodePB(self.inputs).run()
+            all_docs.append(modified_code_files)
+            # break
 
         self.inputs["modified_code_files"] = all_docs
         number = len(self.inputs["modified_code_files"])
-        self.inputs["pr_title"] = "Patchwork PR for Updating SDK Docs"
+        self.inputs["pr_title"] = "Patchwork PR for Updating SDK Docs with Claude"
         self.inputs["pr_header"] = f"This pull request from patchwork updates {number} SDK Docs"
         outputs = PR(self.inputs).run()
 
